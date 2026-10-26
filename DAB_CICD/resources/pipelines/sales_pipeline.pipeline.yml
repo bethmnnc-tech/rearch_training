@@ -1,0 +1,19 @@
+# Sales pipeline. Same definition in every environment.
+# root_path is ../../src (so `import sales_etl` works) and two new
+# configuration keys drive the Method 1 integration tests.
+resources:
+  pipelines:
+    sales_pipeline:
+      name: sales_pipeline_${var.environment}
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      root_path: ../../src                     # src/ is on sys.path -> sales_etl imports
+      libraries:
+        - glob:
+            include: ../../src/pipelines/sales/transformations/**
+      configuration:
+        source_path: ${var.source_path}
+        environment: ${var.environment}
+        run_integration_tests: ${var.run_integration_tests}   # "true" in dev/uat, "false" in prod
+        expected_order_count: ${var.expected_order_count}     # known count in the static test files

@@ -1,0 +1,86 @@
+# Azure DevOps: dev, WITH tests. Register as /cicd/azure-devops/deploy-dev.yml
+#   PR into develop/main : test -> validate              (no deploy)
+#   push to develop      : test -> validate -> deploy dev -> run tests job on Databricks
+trigger:
+  branches:
+    include: [develop]
+pr:
+  branches:
+    include: [develop, main]
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  BUNDLE_TARGET: dev
+  SERVICE_CONNECTION: sc-databricks-dev   # ARM service connection, workload identity federation
+
+stages:
+  # ---- Stage 1: unit tests on the agent (ubuntu-latest images include Java). ----
+  - stage: test
+    jobs:
+      - job: unit_tests
+        steps:
+          - checkout: self
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+          - script: pip install -r requirements-dev.txt
+            displayName: Install test dependencies
+          - script: >
+              pytest -m "not integration"
+              --junitxml=test-results/junit.xml
+              --cov=src --cov-report=xml:test-results/coverage.xml --cov-fail-under=80
+            displayName: Run unit tests
+          - task: PublishTestResults@2       # shows results in the pipeline's Tests tab
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: test-results/junit.xml
+          - task: PublishCodeCoverageResults@2
+            condition: succeededOrFailed()
+            inputs:
+              summaryFileLocation: test-results/coverage.xml
+
+  - stage: validate
+    dependsOn: test
+    jobs:
+      - job: validate
+        steps:
+          - checkout: self
+          - script: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+            displayName: Install Databricks CLI
+          - task: AzureCLI@2
+            displayName: Validate bundle
+            inputs:
+              azureSubscription: ${{ variables.SERVICE_CONNECTION }}
+              useGlobalConfig: true
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: databricks bundle validate -t $(BUNDLE_TARGET)
+
+  - stage: deploy
+    dependsOn: validate
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - deployment: deploy_dev
+        environment: databricks-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+                  displayName: Install Databricks CLI
+                - task: AzureCLI@2
+                  displayName: Deploy bundle and run tests job on Databricks
+                  inputs:
+                    azureSubscription: ${{ variables.SERVICE_CONNECTION }}
+                    useGlobalConfig: true
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -e
+                      databricks bundle deploy -t $(BUNDLE_TARGET)
+                      databricks bundle run unit_tests -t $(BUNDLE_TARGET)
+                      databricks bundle run sales_integration_tests -t $(BUNDLE_TARGET)

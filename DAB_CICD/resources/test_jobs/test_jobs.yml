@@ -1,0 +1,76 @@
+# Test jobs: deployed to dev and uat ONLY. Prod never gets them.
+# Defined under targets (not top-level resources) so `bundle deploy -t prod` skips them.
+# The uat copies reuse the dev definitions through YAML anchors (&name / *name).
+# Paths are relative to THIS file.
+#
+# CI runs them right after deploy:
+#   databricks bundle run unit_tests -t <dev|uat>                # pytest on Databricks (incl. temp-schema integration tests)
+#   databricks bundle run sales_integration_tests -t <dev|uat>   # unit -> pipeline -> integration checks -> publish
+
+targets:
+  dev:
+    resources:
+      jobs:
+        unit_tests: &unit_tests_job
+          name: sales_etl_unit_tests_${var.environment}
+          tags:
+            environment: ${var.environment}
+            purpose: ci-tests
+          max_concurrent_runs: 1
+          timeout_seconds: 1800
+          tasks:
+            - task_key: pytest_on_databricks
+              notebook_task:                       # serverless: no cluster block
+                notebook_path: ../../src/notebooks/run_tests.py
+                base_parameters:
+                  markers: ""                      # all tests, incl. @integration
+                  test_catalog: ${var.catalog}     # temp schemas created + dropped here
+
+        sales_integration_tests: &integration_tests_job
+          name: sales_integration_tests_${var.environment}
+          tags:
+            environment: ${var.environment}
+            purpose: ci-tests
+          max_concurrent_runs: 1
+          timeout_seconds: 3600
+          parameters:                              # reach every notebook task as widgets
+            - name: catalog
+              default: ${var.catalog}
+            - name: schema
+              default: ${var.schema}
+            - name: expected_order_count
+              default: ${var.expected_order_count}
+          tasks:
+            - task_key: unit_tests                 # 1. functions in isolation; fail fast
+              notebook_task:
+                notebook_path: ../../src/notebooks/run_tests.py
+                base_parameters:
+                  markers: "not integration"
+                  test_catalog: ""
+            - task_key: refresh_pipeline           # 2. same pipeline as prod (+ Method 1 test views in dev/uat)
+              depends_on:
+                - task_key: unit_tests
+              pipeline_task:
+                pipeline_id: ${resources.pipelines.sales_pipeline.id}
+            - task_key: it_silver_orders           # 3. Method 2 checks, in parallel
+              depends_on:
+                - task_key: refresh_pipeline
+              notebook_task:
+                notebook_path: ../../src/notebooks/integration_tests/it_silver_orders.py
+            - task_key: it_gold_daily_sales
+              depends_on:
+                - task_key: refresh_pipeline
+              notebook_task:
+                notebook_path: ../../src/notebooks/integration_tests/it_gold_daily_sales.py
+            - task_key: publish_gold               # 4. only after every check passed
+              depends_on:
+                - task_key: it_silver_orders
+                - task_key: it_gold_daily_sales
+              notebook_task:
+                notebook_path: ../../src/notebooks/publish_gold.py
+
+  uat:
+    resources:
+      jobs:
+        unit_tests: *unit_tests_job
+        sales_integration_tests: *integration_tests_job

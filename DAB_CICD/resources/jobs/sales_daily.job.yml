@@ -1,0 +1,36 @@
+# Same job definition in every environment; only ${var.*} values change.
+resources:
+  jobs:
+    sales_daily:
+      name: sales_daily_${var.environment}
+      tags:
+        environment: ${var.environment}
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: America/New_York
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+      tasks:
+        - task_key: refresh_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.sales_pipeline.id}
+
+        - task_key: publish_gold
+          depends_on:
+            - task_key: refresh_pipeline
+          notebook_task:
+            notebook_path: ../../src/notebooks/publish_gold.py   # relative to THIS file
+
+        - task_key: data_quality_checks
+          depends_on:
+            - task_key: publish_gold
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../../src/sql/dq_checks.sql

@@ -1,0 +1,43 @@
+# databricks.yml — the bundle root.
+# Targets say WHERE to deploy. Everything under resources/ says WHAT to deploy
+# and, in resources/variables/<env>.yml, WITH WHICH VALUES per environment.
+
+bundle:
+  name: sales_etl
+
+include:
+  - resources/variables/*.yml
+  - resources/jobs/*.yml
+  - resources/pipelines/*.yml
+  - resources/test_jobs/*.yml     # unit + integration test jobs, dev and uat targets only
+
+# Tests: pytest config is in pyproject.toml, tests in tests/, custom functions in src/sales_etl/.
+# CI runs `pytest -m "not integration"` BEFORE deploy, then `bundle run unit_tests` and
+# `bundle run sales_integration_tests` AFTER deploying dev or uat. See README.md.
+# Local-only files (.venv, .pytest_cache, test-results) are in .gitignore, which bundle sync honors.
+
+targets:
+  dev:
+    mode: development          # [dev <user>] name prefix, schedules paused, dev pipelines
+    default: true
+    workspace:
+      host: https://adb-1111111111111111.11.azuredatabricks.net
+
+  uat:
+    mode: production           # validates run_as, non-dev pipelines, git branch
+    workspace:
+      host: https://adb-2222222222222222.12.azuredatabricks.net
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    git:
+      branch: main
+
+  prod:
+    mode: production
+    workspace:
+      host: https://adb-3333333333333333.13.azuredatabricks.net
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    git:
+      branch: main
+
+# Single-workspace setup? Use the same host in all three targets and let
+# catalog/schema (set in resources/variables/<env>.yml) separate the data.

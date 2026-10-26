@@ -1,0 +1,16 @@
+# UAT values, identity and permissions.
+targets:
+  uat:
+    variables:
+      environment: uat
+      catalog: uat_sales
+      schema: sales
+      source_path: /Volumes/uat_sales/raw/landing
+      notification_email: de-team-uat@example.com
+    run_as:
+      service_principal_name: <uat-sp-application-id>
+    permissions:
+      - group_name: data-engineers
+        level: CAN_VIEW
+      - service_principal_name: <uat-sp-application-id>
+        level: CAN_MANAGE

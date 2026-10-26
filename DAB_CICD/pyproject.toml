@@ -1,0 +1,13 @@
+[project]
+name = "sales_etl"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]          # tests_sdp_editor/ is NOT here: those run only in the Pipelines Editor
+pythonpath = ["src"]           # lets tests `import sales_etl` without installing the package
+addopts = "-ra --strict-markers"
+markers = [
+  "integration: needs Databricks (Delta + Unity Catalog); skipped in the CI unit stage",
+]
+filterwarnings = ["ignore::DeprecationWarning"]

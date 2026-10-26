@@ -1,0 +1,17 @@
+# Declares every variable once. Values per environment live in dev.yml, uat.yml, prod.yml.
+variables:
+  environment:
+    description: Short environment name (dev, uat, prod) used in names and tags
+  catalog:
+    description: Unity Catalog catalog for this environment
+  schema:
+    description: Target schema inside the catalog
+    default: sales
+  source_path:
+    description: Landing volume path for raw files
+  notification_email:
+    description: Who gets failure emails
+  warehouse_id:
+    description: SQL warehouse used by SQL tasks (looked up by name per workspace)
+    lookup:
+      warehouse: Serverless Starter Warehouse

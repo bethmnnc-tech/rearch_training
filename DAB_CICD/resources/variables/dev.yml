@@ -1,0 +1,9 @@
+# Dev values. No run_as: jobs run as whoever deploys (the developer, or the dev CI principal).
+targets:
+  dev:
+    variables:
+      environment: dev
+      catalog: dev_sales
+      schema: sales
+      source_path: /Volumes/dev_sales/raw/landing
+      notification_email: de-team-dev@example.com

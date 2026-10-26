@@ -1,0 +1,71 @@
+# GitHub Actions: dev, WITH tests.
+# Copy to .github/workflows/ (GitHub only runs workflows from there).
+#
+#   PR into develop/main : unit tests -> bundle validate            (no deploy)
+#   push to develop      : unit tests -> validate -> deploy dev -> run tests job on Databricks
+name: Test and deploy bundle - dev
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  id-token: write      # OIDC to Databricks
+  contents: read
+  checks: write        # lets the test-report step annotate the PR (optional)
+
+concurrency:
+  group: databricks-dev
+  cancel-in-progress: false
+
+jobs:
+  # ---- Stage 1: unit tests on the runner. No Databricks, no secrets, ~1 min. ----
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-java@v4        # local PySpark needs a JVM
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pip install -r requirements-dev.txt
+      - name: Run unit tests
+        run: >
+          pytest -m "not integration"
+          --junitxml=test-results/junit.xml
+          --cov=src --cov-report=xml:test-results/coverage.xml --cov-fail-under=80
+      - uses: actions/upload-artifact@v4
+        if: always()                        # keep the report even when tests fail
+        with:
+          name: unit-test-results
+          path: test-results/
+
+  # ---- Stage 2: validate + deploy dev, then run the tests job on Databricks. ----
+  deploy:
+    needs: unit-tests                       # a red test stops the deploy
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      DATABRICKS_AUTH_TYPE: github-oidc
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_BUNDLE_TARGET: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main     # pin to a release tag in real use
+      - run: databricks bundle validate
+      - run: databricks bundle deploy
+        if: github.event_name != 'pull_request'
+      - name: Integration tests on Databricks (pytest, temp schema)
+        if: github.event_name != 'pull_request'
+        run: databricks bundle run unit_tests   # waits for the run; non-zero exit if pytest fails
+      - name: Integration tests on the pipeline (SDP expectations + Job tasks)
+        if: github.event_name != 'pull_request'
+        run: databricks bundle run sales_integration_tests   # pipeline refresh -> test tasks

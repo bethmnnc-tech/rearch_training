@@ -1,0 +1,16 @@
+# Prod values, identity and permissions.
+targets:
+  prod:
+    variables:
+      environment: prod
+      catalog: prod_sales
+      schema: sales
+      source_path: /Volumes/prod_sales/raw/landing
+      notification_email: de-oncall@example.com
+    run_as:
+      service_principal_name: <prod-sp-application-id>
+    permissions:
+      - group_name: data-engineers
+        level: CAN_VIEW
+      - service_principal_name: <prod-sp-application-id>
+        level: CAN_MANAGE

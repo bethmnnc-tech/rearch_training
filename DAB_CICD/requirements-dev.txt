@@ -1,0 +1,6 @@
+# Local + CI unit test dependencies. Pin pyspark to the Spark version of the
+# Databricks runtime / serverless environment you deploy to.
+# Do NOT also install databricks-connect in this environment (they conflict).
+pyspark==4.2.0
+pytest>=8
+pytest-cov>=5

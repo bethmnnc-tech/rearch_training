@@ -1,0 +1,22 @@
+# Integration test switches. Declared once, set per target, all in one file
+# (included by `resources/variables/*.yml`; includes merge with dev/uat/prod.yml).
+variables:
+  run_integration_tests:
+    description: Add SDP test views (Method 1) to the pipeline graph
+    default: "false"
+  expected_order_count:
+    description: Rows silver_orders must have after loading the static test files
+    default: "-1"
+
+targets:
+  dev:
+    variables:
+      run_integration_tests: "true"
+      expected_order_count: "4"     # static files in /Volumes/dev_sales/raw/landing
+  uat:
+    variables:
+      run_integration_tests: "true"
+      expected_order_count: "4"     # same static files copied to uat
+  prod:
+    variables:
+      run_integration_tests: "false"  # never create test views on real data
