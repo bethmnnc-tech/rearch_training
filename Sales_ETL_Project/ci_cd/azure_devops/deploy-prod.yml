@@ -1,0 +1,38 @@
+# Azure DevOps pipeline: prod. Register in ADO: New pipeline > Existing Azure Pipelines YAML file > /ci_cd/azure_devops/deploy-prod.yml
+# Push/merge into the prod branch: validate -> deploy prod. Put an Approvals check on the "databricks-prod" ADO environment.
+trigger:
+  branches:
+    include: [prod]
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  BUNDLE_TARGET: prod
+  SERVICE_CONNECTION: sc-databricks-prod
+
+stages:
+  - stage: deploy
+    condition: eq(variables['Build.SourceBranch'], 'refs/heads/prod')   # guard against manual runs from other branches
+    jobs:
+      - deployment: deploy_prod
+        environment: databricks-prod     # approval gate lives here
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+                  displayName: Install Databricks CLI
+                - task: AzureCLI@2
+                  displayName: Validate and deploy bundle to prod
+                  inputs:
+                    azureSubscription: ${{ variables.SERVICE_CONNECTION }}   # template expression: resolved at compile time
+                    useGlobalConfig: true
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -e
+                      databricks bundle validate -t $(BUNDLE_TARGET)
+                      databricks bundle deploy -t $(BUNDLE_TARGET)

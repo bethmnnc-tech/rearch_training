@@ -1,0 +1,6 @@
+{"order_id": 1, "customer_id": "C1", "amount": 120.00, "status": "new", "order_date": "2026-10-01", "updated_at": "2026-10-01T09:00:00Z"}
+{"order_id": 2, "customer_id": "C2", "amount": 45.50, "status": "new", "order_date": "2026-10-01", "updated_at": "2026-10-01T09:05:00Z"}
+{"order_id": 2, "customer_id": "C2", "amount": 45.50, "status": "shipped", "order_date": "2026-10-01", "updated_at": "2026-10-02T08:00:00Z"}
+{"order_id": 3, "customer_id": " C3 ", "amount": 980.25, "status": " delivered", "order_date": "2026-10-02", "updated_at": "2026-10-02T10:00:00Z"}
+{"order_id": 4, "customer_id": "C1", "amount": 15.00, "status": "cancelled", "order_date": "2026-10-02", "updated_at": "2026-10-02T11:00:00Z"}
+{"order_id": 5, "customer_id": null, "amount": 60.00, "status": "new", "order_date": "2026-10-02", "updated_at": "2026-10-02T12:00:00Z"}

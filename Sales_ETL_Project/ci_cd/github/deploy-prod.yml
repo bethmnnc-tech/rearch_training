@@ -1,0 +1,33 @@
+# GitHub Actions: prod. Copy to .github/workflows/ at the repo root (GitHub only runs workflows from there).
+# Push/merge into the prod branch deploys prod. Give the "prod" GitHub environment
+# required reviewers and a prod-only deployment branch rule.
+name: Deploy bundle - prod
+
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: databricks-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/prod'     # guard against manual runs from other branches
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      DATABRICKS_AUTH_TYPE: github-oidc
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_BUNDLE_TARGET: prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main     # pin to a release tag in real use
+      - run: databricks bundle validate
+      - run: databricks bundle deploy

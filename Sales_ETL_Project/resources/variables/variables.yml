@@ -1,0 +1,83 @@
+# All variables for all environments, in one file.
+# 1. Declare a new variable under `variables:` (description + optional default).
+# 2. Scroll down and set its value in the dev, uat and prod sections.
+# Each environment section also holds its run_as identity and permissions.
+
+# ============================================================================
+# DECLARATIONS
+# ============================================================================
+variables:
+  environment:
+    description: Short environment name (dev, uat, prod) used in names and tags
+  catalog:
+    description: Unity Catalog catalog for this environment
+  schema:
+    description: Target schema inside the catalog
+    default: sales
+  source_path:
+    description: Landing volume path for raw files
+  notification_email:
+    description: Who gets failure emails
+  warehouse_id:
+    description: SQL warehouse used by SQL tasks (looked up by name per workspace)
+    lookup:
+      warehouse: Serverless Starter Warehouse
+
+  # Integration test switches
+  run_integration_tests:
+    description: Add SDP test views (Method 1) to the pipeline graph
+    default: "false"
+  expected_order_count:
+    description: Rows silver_orders must have after loading the static test files (see test_data/README.md)
+    default: "-1"
+
+# ============================================================================
+# VALUES PER ENVIRONMENT
+# ============================================================================
+targets:
+
+  # ---- dev: no run_as, jobs run as whoever deploys (developer or dev CI principal) ----
+  dev:
+    variables:
+      environment: dev
+      catalog: dev_sales
+      schema: sales
+      source_path: /Volumes/dev_sales/raw/landing
+      notification_email: de-team-dev@example.com
+      run_integration_tests: "true"
+      expected_order_count: "4"
+
+  # ---- uat ----
+  uat:
+    variables:
+      environment: uat
+      catalog: uat_sales
+      schema: sales
+      source_path: /Volumes/uat_sales/raw/landing
+      notification_email: de-team-uat@example.com
+      run_integration_tests: "true"
+      expected_order_count: "4"       # same test_data/ files, seeded into uat
+    run_as:
+      service_principal_name: <uat-sp-application-id>
+    permissions:
+      - group_name: data-engineers
+        level: CAN_VIEW
+      - service_principal_name: <uat-sp-application-id>
+        level: CAN_MANAGE
+
+  # ---- prod ----
+  prod:
+    variables:
+      environment: prod
+      catalog: prod_sales
+      schema: sales
+      source_path: /Volumes/prod_sales/raw/landing
+      notification_email: de-oncall@example.com
+      run_integration_tests: "false"  # never create test views on real data
+    run_as:
+      service_principal_name: <prod-sp-application-id>
+    permissions:
+      - group_name: data-engineers
+        level: CAN_VIEW
+      - service_principal_name: <prod-sp-application-id>
+        level: CAN_MANAGE
